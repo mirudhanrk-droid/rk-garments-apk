@@ -9,7 +9,7 @@ jobs:
 
     steps:
       - name: Download project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install system packages
         run: |
@@ -40,7 +40,7 @@ jobs:
           buildozer -v android debug
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: RK-Garments-APK
           path: bin/*.apk
