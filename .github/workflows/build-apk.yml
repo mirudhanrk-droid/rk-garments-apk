@@ -8,17 +8,47 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
+
+      # --------------------------------------------------
+      # 1. Download your GitHub project
+      # --------------------------------------------------
       - name: Download project
         uses: actions/checkout@v5
 
+
+      # --------------------------------------------------
+      # 2. Install Java 17
+      # --------------------------------------------------
+      - name: Set up Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+
+      # --------------------------------------------------
+      # 3. Check Java version
+      # --------------------------------------------------
+      - name: Check Java
+        run: |
+          java -version
+          echo "JAVA_HOME=$JAVA_HOME"
+          which java
+
+
+      # --------------------------------------------------
+      # 4. Install Linux packages
+      # --------------------------------------------------
       - name: Install system packages
         run: |
           sudo apt-get update
+
           sudo apt-get install -y \
             git \
             zip \
             unzip \
-            openjdk-17-jdk \
+            wget \
+            curl \
             autoconf \
             automake \
             libtool \
@@ -30,45 +60,115 @@ jobs:
             libffi-dev \
             libssl-dev
 
+
+      # --------------------------------------------------
+      # 5. Install Python / Buildozer
+      # --------------------------------------------------
       - name: Install Python packages
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install buildozer cython==0.29.37
+          python3 -m pip install buildozer
+          python3 -m pip install cython==0.29.37
 
+
+      # --------------------------------------------------
+      # 6. Install Android SDK command line tools
+      # --------------------------------------------------
       - name: Install Android SDK command line tools
         run: |
-          mkdir -p $HOME/android-sdk/cmdline-tools
-          cd $HOME/android-sdk
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-          unzip -q commandlinetools-linux-11076708_latest.zip
-          mv cmdline-tools cmdline-tools-temp
-          mkdir -p cmdline-tools/latest
-          mv cmdline-tools-temp/* cmdline-tools/latest/
+          mkdir -p "$HOME/android-sdk/cmdline-tools"
 
+          cd "$HOME/android-sdk"
+
+          wget -q \
+            https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+
+          unzip -q commandlinetools-linux-11076708_latest.zip
+
+          mkdir -p "$HOME/android-sdk/cmdline-tools/latest"
+
+          mv cmdline-tools/* \
+            "$HOME/android-sdk/cmdline-tools/latest/"
+
+
+      # --------------------------------------------------
+      # 7. Set Android SDK environment
+      # --------------------------------------------------
       - name: Set Android SDK environment
         run: |
-          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
-          echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
-          echo "$HOME/android-sdk/build-tools/35.0.0" >> $GITHUB_PATH
+          echo "ANDROID_HOME=$HOME/android-sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> "$GITHUB_ENV"
 
+          echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$HOME/android-sdk/platform-tools" >> "$GITHUB_PATH"
+          echo "$HOME/android-sdk/build-tools/35.0.0" >> "$GITHUB_PATH"
+
+
+      # --------------------------------------------------
+      # 8. Verify Java + SDK manager
+      # --------------------------------------------------
+      - name: Check SDK manager
+        run: |
+          java -version
+          sdkmanager --version
+
+
+      # --------------------------------------------------
+      # 9. Accept Android licenses and install SDK
+      # --------------------------------------------------
       - name: Install Android SDK packages
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          yes | sdkmanager --licenses
 
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+
+      # --------------------------------------------------
+      # 10. Check AIDL
+      # --------------------------------------------------
       - name: Check AIDL
         run: |
+          echo "Checking Android Build Tools..."
+
           ls -la "$ANDROID_HOME/build-tools/35.0.0"
+
           "$ANDROID_HOME/build-tools/35.0.0/aidl" --version
 
+
+      # --------------------------------------------------
+      # 11. Check project files
+      # --------------------------------------------------
+      - name: Check project
+        run: |
+          echo "Project files:"
+          ls -la
+
+          echo ""
+          echo "Checking main.py:"
+          test -f main.py
+
+          echo ""
+          echo "Checking buildozer.spec:"
+          test -f buildozer.spec
+
+
+      # --------------------------------------------------
+      # 12. Build APK
+      # --------------------------------------------------
       - name: Build APK
         run: |
           buildozer -v android debug
 
+
+      # --------------------------------------------------
+      # 13. Upload APK
+      # --------------------------------------------------
       - name: Upload APK
         uses: actions/upload-artifact@v5
         with:
           name: RK-Garments-APK
           path: bin/*.apk
+          if-no-files-found: error
